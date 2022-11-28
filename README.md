@@ -65,7 +65,7 @@ We compare HSICAggInc to
 - Code: [fsic-test
  repository](https://github.com/wittawatj/fsic-test) by [Wittawat Jitkrittum](https://github.com/wittawatj)
 
-We compare KSDAggInc to 
+We compare KSDAggInc to
 - Test: FSSD (Finite Set Stein Discrepancy)
 - Paper: [A Linear-Time Kernel Goodness-of-Fit Test](https://papers.nips.cc/paper/2017/file/979d472a84804b9f647bc185a877a8b5-Paper.pdf)
 - Authors: Wittawat Jitkrittum, Wenkai Xu, Zoltán Szabó, Kenji Fukumizu, Arthur Gretton
@@ -78,6 +78,13 @@ and to
 for Training and Evaluating Energy-Based Models without Sampling](http://proceedings.mlr.press/v119/grathwohl20a/grathwohl20a.pdf)
 - Authors: Will Grathwohl, Kuan-Chieh Wang, Jörn-Henrik Jacobsen, David Duvenaud, Richard Zemel
 - Code: [LSD repository](https://github.com/wgrathwohl/LSD) by [Will Grathwohl](https://github.com/wgrathwohl)
+
+and to
+
+- Tests: L1 IMQ and Cauchy RFF (Random Fourier Feature)
+- Paper: [Random Feature Stein Discrepancies](https://proceedings.neurips.cc/paper/2018/file/0f840be9b8db4d3fbd5ba2ce59211f55-Paper.pdf)
+- Authors: Jonathan H. Huggins, Lester Mackey
+- Code: [RFSD repository](https://bitbucket.org/jhhuggins/random-feature-stein-discrepancies/) by [Jonathan Huggins](https://bitbucket.org/jhhuggins/)
 
 ## Author
 
@@ -92,18 +99,12 @@ Inria London
 ## Bibtex
 
 ```
-@unpublished{schrab2022efficient,
-    title={Efficient Aggregated Kernel Tests using Incomplete U-statistics},
-    author={Antonin Schrab and Ilmun Kim and Benjamin Guedj and Arthur Gretton}
-    year={2022},
-    note = "Submitted.",
-    abstract = {We propose a series of computationally efficient, nonparametric tests for the two-sample, independence and goodness-of-fit problems, using the  Maximum Mean Discrepancy (MMD), Hilbert Schmidt Independence Criterion (HSIC), and Kernel Stein Discrepancy (KSD), respectively. Our test statistics are incomplete U-statistics, with a computational cost that interpolates between linear time in the number of samples, and quadratic time, as associated with classical U-statistic tests. The three proposed tests aggregate over several kernel bandwidths to detect departures from the null on various scales: we call the resulting tests MMDAggInc, HSICAggInc and KSDAggInc. For the test thresholds, we derive a quantile bound for wild bootstrapped incomplete U-statistics, which is of independent interest. We derive uniform separation rates for MMDAggInc and HSICAggInc, and quantify exactly the trade-off between computational efficiency and the attainable rates: this result is novel for tests based on incomplete U-statistics, to our knowledge. We further show that in the quadratic-time case, the wild bootstrap incurs no penalty to test power over more widespread permutation-based approaches, since both attain the same minimax optimal rates (which in turn match the rates that use oracle quantiles). We support our claims with numerical experiments  on the trade-off between computational efficiency and test power.},
-    url = {https://arxiv.org/abs/2206.09194},
-    url_PDF = {https://arxiv.org/pdf/2206.09194.pdf},
-    url_Code = {https://github.com/antoninschrab/agginc-paper},
-    eprint={2206.09194},
-    archivePrefix={arXiv},
-    primaryClass={stat.ML}
+@inproceedings{schrab2022efficient,
+  author    = {Antonin Schrab and Ilmun Kim and Benjamin Guedj and Arthur Gretton},
+  title     = {Efficient Aggregated Kernel Tests using Incomplete {$U$}-statistics},
+  booktitle = {Advances in Neural Information Processing Systems 35: Annual Conference
+               on Neural Information Processing Systems 2022, NeurIPS 2022},
+  year      = {2022},
 }
 ```
 

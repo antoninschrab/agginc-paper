@@ -221,7 +221,7 @@ def compute_quantile(bootstrap_values, original_value, B1, B2, B3, alpha, weight
     return quantiles
 
 
-def agginc(agg_type, X, Y, alpha, R, l_minus, l_plus, B1, B2, B3, weights_type, seed):
+def agginc(agg_type, X, Y, alpha, R, l_minus, l_plus, B1, B2, B3, weights_type, seed, power=2):
     """
     Efficient Aggregated Kernel Tests
     AggInc tests: MMDAggInc, HSICAggInc and KSDAggInc
@@ -245,7 +245,7 @@ def agginc(agg_type, X, Y, alpha, R, l_minus, l_plus, B1, B2, B3, weights_type, 
         Z = np.concatenate((X, Y))
         median_bandwidth = compute_median_bandwidth(seed, Z)
         bandwidths = np.array(
-            [2**i * median_bandwidth for i in range(l_minus, l_plus + 1)]
+            [power**i * median_bandwidth for i in range(l_minus, l_plus + 1)]
         )
     elif agg_type == "hsic":
         assert weights_type == "uniform"
@@ -262,14 +262,14 @@ def agginc(agg_type, X, Y, alpha, R, l_minus, l_plus, B1, B2, B3, weights_type, 
         median_bandwidth_Y = compute_median_bandwidth(seed + 1, Y)
         median_bandwidths = (median_bandwidth_X, median_bandwidth_Y)
         bandwidths = [
-            [2**i * median_bandwidths[j] for i in range(l_minus[j], l_plus[j] + 1)]
+            [power**i * median_bandwidths[j] for i in range(l_minus[j], l_plus[j] + 1)]
             for j in range(2)
         ]
     elif agg_type == "ksd":
         compute_h_values = compute_h_KSD_values
         median_bandwidth = compute_median_bandwidth(seed, X)
         bandwidths = np.array(
-            [2**i * median_bandwidth for i in range(l_minus, l_plus + 1)]
+            [power**i * median_bandwidth for i in range(l_minus, l_plus + 1)]
         )
     else:
         raise ValueError('The value of agg_type should be "mmd" or' '"hsic" or "ksd".')

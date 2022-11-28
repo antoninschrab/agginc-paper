@@ -8,3 +8,4 @@ theano
 mkl-service
 future
 autograd
+scikit-learn
