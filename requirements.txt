@@ -9,3 +9,5 @@ mkl-service
 future
 autograd
 scikit-learn
+psutil
+gputil
