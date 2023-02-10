@@ -56,7 +56,7 @@ def agginc(
     R : int
         Number of superdiagonals to consider. 
         If R >= min(N_X, N_Y) - 1 then the complete U-statistic is computed in quadratic time.
-    alpha: scalar
+    alpha: float
         The level alpha must be between 0 and 1.
     weights_type: str
         Must be "uniform", or "centred", or "increasing", or "decreasing".
@@ -79,7 +79,7 @@ def agginc(
         Using batch_size = "auto", calculates automatically the batch_size which uses 80% of the memory.
         For faster runtimes but using more memory, use batch_size = None (equivalent to batch_size = B1 + B2)
         By decreasing batch_size from B1 + B2, the memory cost is reduced but the runtimes increase.
-    memory_percentage: scalar
+    memory_percentage: float
         The value of memory_percentage must be between 0 and 1.
         It is used when batch_size = "auto", the batch_size is calculated automatically to use memory_percentage of the memory.
     B1: int
@@ -92,7 +92,7 @@ def agginc(
         Random seed used for the randomness of the Rademacher variables.
     return_dictionary: bool
         If true, a dictionary is also returned containing the overall test out and for each single test: 
-        the test output, the kernel, the bandwidth, the KSD value, the KSD quantile value, 
+        the test output, the kernel, the bandwidth, the statistic value, the quantile value, 
         the p-value and the p-value threshold value.
    bandwidths: array_like or list or None
         If bandwidths is None, the collection of bandwidths is computed automatically.
@@ -114,6 +114,7 @@ def agginc(
         Dictionary containing the overall output of the AggInc test, and for each single test: 
         the test output, the kernel, the bandwidth, the statistic, the quantile, 
         the p-value and the p-value threshold.
+    
     
     Examples
     --------
@@ -203,7 +204,7 @@ def agginc(
     elif agg_type == "ksd":
         compute_h_values = compute_h_KSD_values
     else:
-        raise ValueError('The value of agg_type should be "mmd" or' '"hsic" or "ksd".')
+        raise ValueError('The value of agg_type should be "mmd" or "hsic" or "ksd".')
         
     # collection of bandwidths
     if bandwidths is not None:
@@ -290,6 +291,229 @@ def agginc(
     )
     
     return output
+
+
+def inc(
+    agg_type, 
+    X, 
+    Y, 
+    R=200,
+    alpha=0.05,
+    batch_size="auto",
+    memory_percentage=0.8,
+    B=500, 
+    seed=42,
+    return_dictionary=False,
+    bandwidth=None,
+):
+    """
+    Efficient test for two-sample (MMD), independence (HSIC) and goodness-of-fit 
+    (KSD) testing, using median bandwidth (no aggregation).
+    
+    Given the appropriate data for the type of testing, 
+    return 0 if the test fails to reject the null (i.e. same distribution, independent, fits the data), 
+    or return 1 if the test rejects the null (i.e. different distribution, dependent, does not fit the data).
+    
+    Parameters
+    ----------
+    agginc: str
+        "mmd" or "hsic" or "ksd"
+    X : array_like
+        The shape of X must be of the form (N_X, d_X) where N_X is the number
+        of samples and d_X is the dimension.
+    Y : array_like
+        The shape of Y must be of the form (N_Y, d_Y) 
+        where N_Y is the number of samples and d_Y is the dimension.
+        Case agginc = "mmd": Y is the second sample, we must have d_X = d_Y.
+        Case agginc = "hsic": Y is the paired sample, we must have N_X = N_Y.
+        Case agginc = "ksd": Y is the score of X, we must have N_Y = N_X and d_Y = d_X.
+    R : int
+        Number of superdiagonals to consider. 
+        If R >= min(N_X, N_Y) - 1 then the complete U-statistic is computed in quadratic time.
+    alpha: float
+        The level alpha must be between 0 and 1.
+    batch_size : int or None or str
+        The memory cost consists in storing an array of shape (batch_size, R * N - R * (R - 1) / 2)
+        where batch_size is between 1 and B.
+        Using batch_size = "auto", calculates automatically the batch_size which uses 80% of the memory.
+        For faster runtimes but using more memory, use batch_size = None (equivalent to batch_size = B)
+        By decreasing batch_size from B, the memory cost is reduced but the runtimes increase.
+    memory_percentage: float
+        The value of memory_percentage must be between 0 and 1.
+        It is used when batch_size = "auto", the batch_size is calculated automatically 
+        to use memory_percentage of the memory.
+    B: int
+        B is the number of wild bootstrap samples to approximate the quantiles.
+    seed: int 
+        Random seed used for the randomness of the Rademacher variables.
+    return_dictionary: bool
+        If true, a dictionary is also returned containing the test out, the kernel, the bandwidth, 
+        the statistic, the statistic quantile, the p-value and the p-value threshold value (level).
+   bandwidth: float or list or None
+        If bandwidths is None, the bandwidth used is the median heuristic.
+        Otherwise, the bandwidth provided is used instead.
+        If agg_type is "mmd" or "ksd", then bandwidth needs to be a float.
+        If agg_type is "hsic", then bandwidths should be a list 
+        containing 2 floats (bandwidths for X and Y).
+
+        
+    Returns
+    -------
+    output : int
+        0 if the Inc test fails to reject the null (i.e. same distribution, independent, fits the data), 
+        1 if the Inc test rejects the null (i.e. different distribution, dependent, does not fit the data).
+    dictionary: dict
+        Returned only if return_dictionary is True.
+        Dictionary containing the output of the Inc test, the kernel, the bandwidth, 
+        the statistic, the quantile, the p-value and the p-value threshold (level).
+    
+    Examples
+    --------
+    
+    >>> # MMDInc
+    >>> rs = np.random.RandomState(0)
+    >>> X = rs.randn(500, 10)
+    >>> Y = rs.randn(500, 10) + 1
+    >>> output = inc("mmd", X, Y)
+    >>> output
+    1
+    >>> output, dictionary = inc("mmd", X, Y, return_dictionary=True)
+    >>> output
+    1
+    >>> dictionary
+    {'MMDInc test reject': True,
+     'Kernel': 'Gaussian',
+     'Bandwidth': 5.286007689131921,
+     'MMD': 0.28101008856766124,
+     'MMD quantile': 0.002611614394879011,
+     'p-value': 0.001996007984031936,
+     'p-value threshold': 0.05}
+    
+    >>> # HSICInc
+    >>> rs = np.random.RandomState(0)
+    >>> X = rs.randn(500, 10)
+    >>> Y = 0.5 * X + rs.randn(500, 10)
+    >>> output = inc("hsic", X, Y)
+    >>> output
+    1
+    >>> output, dictionary = inc("hsic", X, Y, return_dictionary=True)
+    >>> output
+    1
+    >>> dictionary
+    {'HSICInc test reject': True,
+     'Kernel': 'Gaussian',
+     'Bandwidth X': 4.276330859630623,
+     'Bandwidth Y': 4.783357279137176,
+     'HSIC': 0.007071571325159379,
+     'HSIC quantile': 0.0004403802401235617,
+     'p-value': 0.001996007984031936,
+     'p-value threshold': 0.05}
+    
+   >>> # KSDInc
+    >>> perturbation = 0.5
+    >>> rs = np.random.RandomState(0)
+    >>> X = rs.gamma(5 + perturbation, 5, (500, 1))
+    >>> score_gamma = lambda x, k, theta : (k - 1) / x - 1 / theta
+    >>> score_X = score_gamma(X, 5, 5)
+    >>> output = inc("ksd", X, score_X)
+    >>> output
+    1
+    >>> output, dictionary = inc("ksd", X, score_X, return_dictionary=True)
+    >>> output
+    1
+    >>> dictionary
+    {'KSDInc test reject': True,
+     'Kernel': 'imq',
+     'Bandwidth': 10.187002895596237,
+     'KSD': 2.4671437226767908e-05,
+     'KSD quantile': 5.920405142843872e-06,
+     'p-value': 0.001996007984031936,
+     'p-value threshold': 0.05}
+    """
+    
+    # function compute_h_values
+    if agg_type == "mmd":
+        compute_h_values = compute_h_MMD_values
+    elif agg_type == "hsic":
+        compute_h_values = compute_h_HSIC_values
+    elif agg_type == "ksd":
+        compute_h_values = compute_h_KSD_values
+    else:
+        raise ValueError('The value of agg_type should be "mmd" or' '"hsic" or "ksd".')
+        
+    # bandwidth: use provided one or compute median heuristic
+    if bandwidth is not None:
+        if agg_type == "mmd" or agg_type == "ksd":
+            bandwidths = np.array(bandwidth).reshape(1)
+        elif agg_type == "hsic":
+            assert len(bandwidth) == 2
+            bandwidths = (np.array(bandwidth[0]).reshape(1), np.array(bandwidth[1]).reshape(1))
+    elif agg_type == "mmd":
+        max_samples = 500
+        distances = scipy.spatial.distance.cdist(X[:max_samples], Y[:max_samples], "euclidean").reshape(-1)
+        median_bandwidth = np.median(distances[distances > 0])
+        bandwidths = np.array([median_bandwidth])
+    elif agg_type == "hsic":
+        max_samples = 500
+        distances = scipy.spatial.distance.pdist(X[:max_samples], "euclidean") 
+        median_bandwidth_X = np.median(distances[distances > 0])
+        distances = scipy.spatial.distance.pdist(Y[:max_samples], "euclidean")  
+        median_bandwidth_Y = np.median(distances[distances > 0])
+        bandwidths = (np.array([median_bandwidth_X]), np.array([median_bandwidth_Y]))
+    elif agg_type == "ksd":
+        max_samples = 500
+        distances = scipy.spatial.distance.pdist(X[:max_samples], "euclidean")  
+        median_bandwidth = np.median(distances[distances > 0])
+        bandwidths = np.array([median_bandwidth])
+    else:
+        raise ValueError('The value of agg_type should be "mmd" or "hsic" or "ksd".')
+        
+    # compute all h-values
+    h_values, index_i, index_j, N = compute_h_values(
+        X, Y, R, bandwidths, return_indices_N=True
+    )
+    
+    # compute bootstrap and original statistics
+    bootstrap_values, original_value = compute_bootstrap_values(
+        h_values, index_i, index_j, N, B, seed, batch_size, return_original=True, memory_percentage=memory_percentage
+    )
+    original_value = original_value[0]
+    
+    # compute quantile
+    assert bootstrap_values.shape[0] == 1
+    bootstrap_1 = np.column_stack([bootstrap_values, original_value])
+    bootstrap_1_sorted = np.sort(bootstrap_1)
+    quantile = bootstrap_1_sorted[0, int(np.ceil((B + 1) * (1 - alpha))) - 1]
+    
+    # reject if p_val <= alpha
+    p_val = np.mean((bootstrap_1 - original_value.reshape(-1, 1) >= 0), -1)[0]
+    reject_p_val = p_val <= alpha
+
+    # reject if original_value > quantile
+    reject_stat_val = original_value > quantile
+
+    # assert both rejection methods are equivalent
+    assert reject_p_val == reject_stat_val
+
+    # create rejection dictionary 
+    reject_dictionary = {}
+    reject_dictionary[agg_type.upper() + "Inc test reject"] = reject_p_val
+    reject_dictionary["Kernel"] = "imq" if agg_type == "ksd" else "Gaussian"
+    if agg_type == "hsic":
+        reject_dictionary["Bandwidth X"] = bandwidths[0][0]
+        reject_dictionary["Bandwidth Y"] = bandwidths[1][0]
+    else:
+        reject_dictionary["Bandwidth"] = bandwidths[0]
+    reject_dictionary[agg_type.upper()] = original_value
+    reject_dictionary[agg_type.upper() + " quantile"] = quantile
+    reject_dictionary["p-value"] = p_val
+    reject_dictionary["p-value threshold"] = alpha
+
+    # return output and dictionary
+    if return_dictionary:
+        return int(reject_dictionary[agg_type.upper() + "Inc test reject"]), reject_dictionary
+    else:
+        return int(reject_dictionary[agg_type.upper() + "Inc test reject"])
 
 
 def create_indices(N, R):
@@ -540,7 +764,7 @@ def return_test_output(agg_type, bootstrap_values, original_value, quantiles, u_
         bootstrap_values (#bandwidths, B1 + B2)
         original_value (#bandwidths, )
         quantiles (#bandwidths, )
-        u_correction scalar
+        u_correction float
         bandwidths (#bandwidths, ) for agg_type "mmd" or "hsic", 
                    list for agg_type "hsic" with first and second elements bandwidths_X and bandwidths_Y
         weights_type "uniform" or "decreasing" or "increasing" or "centred"
@@ -644,73 +868,3 @@ def create_weights(N, weights_type):
             '"decreasing" or "increasing" or "centred".'
         )
     return weights
-
-
-def inc_median(agg_type, X, Y, alpha, R, B, seed):
-    """
-    Efficient test using median bandwidth (no aggregation)
-
-    inputs:
-        type in "mmd", "hsic" or "ksd" (Gaussian kernel for "mmd" and "hsic", IMQ kernel for "ksd")
-        X (m, d)
-        Y (n, d) (for ksd Y is score_X and n = m, for hsic n = m)
-        alpha in (0, 1)
-        R int
-        B int
-        seed int
-
-    output: 0 (fail to reject H_0) or 1 (reject H_0)
-    """
-    if agg_type == "mmd":
-        compute_h_values = compute_h_MMD_values
-        Z = np.concatenate((X, Y))
-        assert l_minus == 0
-        number_bandwidths = l_plus
-        max_samples = 500
-        distances = scipy.spatial.distance.cdist(X[:max_samples], Y[:max_samples], "euclidean").reshape(-1)
-        if np.min(distances) < 10 ** (-1):
-            dd = np.sort(distances)
-            lambda_min = np.maximum(dd[int(np.floor(len(dd) * 0.05))], 10 ** (-1))
-        else:
-            lambda_min = np.min(distances)
-        lambda_min = lambda_min * 2
-        lambda_max = np.maximum(np.max(distances), 3 * 10 ** (-1))
-        lambda_max = lambda_max / 2
-        power = (lambda_max / lambda_min) ** (1 / (number_bandwidths - 1))
-        bandwidths = np.array([power ** i * lambda_min for i in range(number_bandwidths)])
-    elif agg_type == "hsic":
-        compute_h_values = compute_h_HSIC_values
-        max_samples=500
-        distances = scipy.spatial.distance.pdist(X[:max_samples], "euclidean") 
-        median_bandwidth_X = np.median(distances[distances > 0])
-        distances = scipy.spatial.distance.pdist(Y[:max_samples], "euclidean")  
-        median_bandwidth_Y = np.median(distances[distances > 0])
-        bandwidths = (np.array([median_bandwidth_X]), np.array([median_bandwidth_Y]))
-    elif agg_type == "ksd":
-        compute_h_values = compute_h_KSD_values
-        assert l_minus == 0
-        number_bandwidths = l_plus
-        max_samples = 500
-        distances = scipy.spatial.distance.pdist(X[:max_samples], "euclidean")  
-        distances = distances[distances > 0]
-        lambda_min = 1
-        lambda_max = np.maximum(np.max(distances), 2)
-        power = (lambda_max / lambda_min) ** (1 / (number_bandwidths - 1))
-        bandwidths = np.array([power ** i * lambda_min / X.shape[1] for i in range(number_bandwidths)])
-    else:
-        raise ValueError('The value of agg_type should be "mmd" or' '"hsic" or "ksd".')
-
-    h_values, index_i, index_j, N = compute_h_values(
-        X, Y, R, bandwidths, return_indices_N=True
-    )
-    bootstrap_values, original_value = compute_bootstrap_values(
-        h_values, index_i, index_j, N, B, seed, return_original=True
-    )
-    assert bootstrap_values.shape[0] == 1
-
-    bootstrap_1 = np.column_stack([bootstrap_values, original_value])
-    bootstrap_1_sorted = np.sort(bootstrap_1)
-    quantile = bootstrap_1_sorted[0, int(np.ceil((B + 1) * (1 - alpha))) - 1]
-    if original_value > quantile:
-        return 1
-    return 0

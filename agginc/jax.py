@@ -98,7 +98,7 @@ def agginc(
         Random seed used for the randomness of the Rademacher variables.
     return_dictionary: bool
         If true, a dictionary is also returned containing the overall test out and for each single test: 
-        the test output, the kernel, the bandwidth, the KSD value, the KSD quantile value, 
+        the test output, the kernel, the bandwidth, the statistic, the quantile, 
         the p-value and the p-value threshold value.
    bandwidths: array_like or list or None
         If bandwidths is None, the collection of bandwidths is computed automatically.
@@ -316,6 +316,249 @@ def agginc(
     )
     
     return output
+
+
+@partial(jit, static_argnums=(0, 3, 4, 5, 6, 7, 8, 9, 10))
+def inc(
+    agg_type, 
+    X, 
+    Y, 
+    R=200,
+    alpha=0.05,
+    batch_size="auto",
+    memory_percentage=0.8,
+    B=500, 
+    seed=42,
+    return_dictionary=False,
+    bandwidth=None,
+):
+    """
+    Efficient test for two-sample (MMD), independence (HSIC) and goodness-of-fit 
+    (KSD) testing, using median bandwidth (no aggregation).
+    
+    Given the appropriate data for the type of testing, 
+    return 0 if the test fails to reject the null (i.e. same distribution, independent, fits the data), 
+    or return 1 if the test rejects the null (i.e. different distribution, dependent, does not fit the data).
+    
+    Parameters
+    ----------
+    agginc: str
+        "mmd" or "hsic" or "ksd"
+    X : array_like
+        The shape of X must be of the form (N_X, d_X) where N_X is the number
+        of samples and d_X is the dimension.
+    Y : array_like
+        The shape of Y must be of the form (N_Y, d_Y) 
+        where N_Y is the number of samples and d_Y is the dimension.
+        Case agginc = "mmd": Y is the second sample, we must have d_X = d_Y.
+        Case agginc = "hsic": Y is the paired sample, we must have N_X = N_Y.
+        Case agginc = "ksd": Y is the score of X, we must have N_Y = N_X and d_Y = d_X.
+    R : int
+        Number of superdiagonals to consider. 
+        If R >= min(N_X, N_Y) - 1 then the complete U-statistic is computed in quadratic time.
+    alpha: float
+        The level alpha must be between 0 and 1.
+    batch_size : int or None or str
+        The memory cost consists in storing an array of shape (batch_size, R * N - R * (R - 1) / 2)
+        where batch_size is between 1 and B.
+        Using batch_size = "auto", calculates automatically the batch_size which uses 80% of the memory.
+        For faster runtimes but using more memory, use batch_size = None (equivalent to batch_size = B)
+        By decreasing batch_size from B, the memory cost is reduced but the runtimes increase.
+    memory_percentage: float
+        The value of memory_percentage must be between 0 and 1.
+        It is used when batch_size = "auto", the batch_size is calculated automatically 
+        to use memory_percentage of the memory.
+    B: int
+        B is the number of wild bootstrap samples to approximate the quantiles.
+    seed: int 
+        Random seed used for the randomness of the Rademacher variables.
+    return_dictionary: bool
+        If true, a dictionary is also returned containing the test out, the kernel, the bandwidth, 
+        the statistic, the statistic quantile, the p-value and the p-value threshold value (level).
+   bandwidth: float or list or None
+        If bandwidths is None, the bandwidth used is the median heuristic.
+        Otherwise, the bandwidth provided is used instead.
+        If agg_type is "mmd" or "ksd", then bandwidth needs to be a float.
+        If agg_type is "hsic", then bandwidths should be a list 
+        containing 2 floats (bandwidths for X and Y).
+
+        
+    Returns
+    -------
+    output : int
+        0 if the Inc test fails to reject the null (i.e. same distribution, independent, fits the data), 
+        1 if the Inc test rejects the null (i.e. different distribution, dependent, does not fit the data).
+    dictionary: dict
+        Returned only if return_dictionary is True.
+        Dictionary containing the output of the Inc test, the kernel, the bandwidth, 
+        the statistic, the quantile, the p-value and the p-value threshold (level).
+    
+    
+    Examples
+    --------
+    
+    >>> # MMDInc
+    >>> key = random.PRNGKey(0)
+    >>> key, subkey = random.split(key)
+    >>> subkeys = random.split(subkey, num=2)
+    >>> X = random.uniform(subkeys[0], shape=(500, 10))
+    >>> Y = random.uniform(subkeys[1], shape=(500, 10)) + 1
+    >>> output = inc("mmd", X, Y)
+    >>> output
+    Array(1, dtype=int32)
+    >>> output.item()
+    1
+    >>> output, dictionary = inc("mmd", X, Y, return_dictionary=True)
+    >>> output
+    Array(1, dtype=int32)
+    >>> from agginc.jax import human_readable_dict
+    >>> human_readable_dict(dictionary)
+    >>> dictionary
+    {'Bandwidth': 3.391918659210205,
+     'Kernel Gaussian': True,
+     'MMD': 0.9845684170722961,
+     'MMD quantile': 0.007270246744155884,
+     'MMDInc test reject': True,
+     'p-value': 0.0019960079807788134,
+     'p-value threshold': 0.05000000074505806}
+    
+    >>> # HSICInc
+    >>> key = random.PRNGKey(0)
+    >>> key, subkey = random.split(key)
+    >>> subkeys = random.split(subkey, num=2)
+    >>> X = random.uniform(subkeys[0], shape=(500, 10))
+    >>> Y = 0.5 * X + random.uniform(subkeys[1], shape=(500, 10))
+    >>> output = inc("hsic", X, Y)
+    >>> output
+    Array(0, dtype=int32)
+    >>> output.item()
+    1
+    >>> output, dictionary = inc("hsic", X, Y, return_dictionary=True)
+    >>> output
+    Array(1, dtype=int32)
+    >>> from agginc.jax import human_readable_dict
+    >>> human_readable_dict(dictionary)
+    >>> dictionary
+    {'Bandwidth X': 1.2791297435760498,
+     'Bandwidth Y': 1.4075509309768677,
+     'HSIC': 0.00903838686645031,
+     'HSIC quantile': 0.0005502101266756654,
+     'HSICInc test reject': True,
+     'Kernel Gaussian': True,
+     'p-value': 0.0019960079807788134,
+     'p-value threshold': 0.05000000074505806}
+    
+    >>> # KSDInc
+    >>> perturbation = 0.5
+    >>> rs = np.random.RandomState(0)
+    >>> X = rs.gamma(5 + perturbation, 5, (500, 1))
+    >>> score_gamma = lambda x, k, theta : (k - 1) / x - 1 / theta
+    >>> score_X = score_gamma(X, 5, 5)
+    >>> X = jnp.array(X)
+    >>> score_X = jnp.array(score_X)
+    >>> output = inc("ksd", X, score_X)
+    >>> output
+    Array(1, dtype=int32)
+    >>> output.item()
+    1
+    >>> output, dictionary = inc("ksd", X, score_X, return_dictionary=True)
+    >>> output
+    Array(1, dtype=int32)
+    >>> from agginc.jax import human_readable_dict
+    >>> human_readable_dict(dictionary)
+    >>> dictionary
+    {'Bandwidth': 10.13830852508545,
+     'KSD': 2.4731751182116568e-05,
+     'KSD quantile': 5.930277438892517e-06,
+     'KSDInc test reject': True,
+     'Kernel IMQ': True,
+     'p-value': 0.0019960079807788134,
+     'p-value threshold': 0.05000000074505806}
+    """
+    
+    # function compute_h_values
+    if agg_type == "mmd":
+        compute_h_values = compute_h_MMD_values
+    elif agg_type == "hsic":
+        compute_h_values = compute_h_HSIC_values
+    elif agg_type == "ksd":
+        compute_h_values = compute_h_KSD_values
+    else:
+        raise ValueError('The value of agg_type should be "mmd" or' '"hsic" or "ksd".')
+        
+    # bandwidth: use provided one or compute median heuristic
+    if bandwidth is not None:
+        if agg_type == "mmd" or agg_type == "ksd":
+            bandwidths = jnp.array(bandwidth).reshape(1)
+        elif agg_type == "hsic":
+            assert len(bandwidth) == 2
+            bandwidths = (jnp.array(bandwidth[0]).reshape(1), jnp.array(bandwidth[1]).reshape(1))
+    elif agg_type == "mmd":
+        max_samples=500
+        distances = jax_distances(X, Y, max_samples)
+        median_bandwidth = jnp.median(distances)
+        bandwidths = jnp.array([median_bandwidth])
+    elif agg_type == "hsic":
+        max_samples=500
+        distances = jax_distances(X, X, max_samples)
+        median_bandwidth_X = jnp.median(distances)
+        distances = jax_distances(Y, Y, max_samples)
+        median_bandwidth_Y = jnp.median(distances)
+        bandwidths = (jnp.array([median_bandwidth_X]), jnp.array([median_bandwidth_Y]))
+    elif agg_type == "ksd":
+        max_samples=500
+        distances = jax_distances(X, X, max_samples)
+        median_bandwidth = jnp.median(distances)
+        bandwidths = jnp.array([median_bandwidth])
+    else:
+        raise ValueError('The value of agg_type should be "mmd" or "hsic" or "ksd".')
+        
+    # compute all h-values
+    h_values, index_i, index_j, N = compute_h_values(
+        X, Y, R, bandwidths, return_indices_N=True
+    )
+    
+    # compute bootstrap and original statistics
+    bootstrap_values, original_value = compute_bootstrap_values(
+        h_values, index_i, index_j, N, B, seed, batch_size, return_original=True, memory_percentage=memory_percentage
+    )
+    original_value = original_value[0]
+    
+    # compute quantile
+    assert bootstrap_values.shape[0] == 1
+    bootstrap_1 = jnp.column_stack([bootstrap_values, original_value])
+    bootstrap_1_sorted = jnp.sort(bootstrap_1)
+    quantile = bootstrap_1_sorted[0, (jnp.ceil((B + 1) * (1 - alpha))).astype(int) - 1]
+    
+    # reject if p_val <= alpha
+    p_val = jnp.mean((bootstrap_1 - original_value.reshape(-1, 1) >= 0), -1)[0]
+    reject_p_val = p_val <= alpha
+
+    # reject if original_value > quantile
+    reject_stat_val = original_value > quantile
+
+    # create rejection dictionary 
+    reject_dictionary = {}
+    reject_dictionary[agg_type.upper() + "Inc test reject"] = reject_p_val
+    if agg_type == "ksd":
+        reject_dictionary["Kernel IMQ"] = True
+    else:
+        reject_dictionary["Kernel Gaussian"] = True
+    if agg_type == "hsic":
+        reject_dictionary["Bandwidth X"] = bandwidths[0][0]
+        reject_dictionary["Bandwidth Y"] = bandwidths[1][0]
+    else:
+        reject_dictionary["Bandwidth"] = bandwidths[0]
+    reject_dictionary[agg_type.upper()] = original_value
+    reject_dictionary[agg_type.upper() + " quantile"] = quantile
+    reject_dictionary["p-value"] = p_val
+    reject_dictionary["p-value threshold"] = alpha
+
+    # return output and dictionary
+    if return_dictionary:
+        return (reject_dictionary[agg_type.upper() + "Inc test reject"]).astype(int), reject_dictionary
+    else:
+        return (reject_dictionary[agg_type.upper() + "Inc test reject"]).astype(int)
 
 
 def create_indices(N, R):
@@ -678,75 +921,6 @@ def create_weights(N, weights_type):
     return weights
 
 
-def inc_median(agg_type, X, Y, alpha, R, B, seed):
-    """
-    Efficient test using median bandwidth (no aggregation)
-
-    inputs:
-        type in "mmd", "hsic" or "ksd" (Gaussian kernel for "mmd" and "hsic", IMQ kernel for "ksd")
-        X (m, d)
-        Y (n, d) (for ksd Y is score_X and n = m, for hsic n = m)
-        alpha in (0, 1)
-        R int
-        B int
-        seed int
-
-    output: 0 (fail to reject H_0) or 1 (reject H_0)
-    """
-    if agg_type == "mmd":
-        compute_h_values = compute_h_MMD_values
-        Z = jnp.concatenate((X, Y))
-        assert l_minus == 0
-        number_bandwidths = l_plus
-        max_samples = 500
-        distances = jax_distances(X, Y, max_samples)
-        if jnp.min(distances) < 10 ** (-1):
-            dd = jnp.sort(distances)
-            lambda_min = jnp.maximum(dd[int(jnp.floor(len(dd) * 0.05))], 10 ** (-1))
-        else:
-            lambda_min = jnp.min(distances)
-        lambda_min = lambda_min * 2
-        lambda_max = jnp.maximum(jnp.max(distances), 3 * 10 ** (-1))
-        lambda_max = lambda_max / 2
-        power = (lambda_max / lambda_min) ** (1 / (number_bandwidths - 1))
-        bandwidths = jnp.array([power ** i * lambda_min for i in range(number_bandwidths)])
-    elif agg_type == "hsic":
-        compute_h_values = compute_h_HSIC_values
-        max_samples=500
-        distances = jax_distances(X, X, max_samples)
-        median_bandwidth_X = jnp.median(distances[distances > 0])
-        distances = jax_distances(Y, Y, max_samples)
-        median_bandwidth_Y = jnp.median(distances[distances > 0])
-        bandwidths = (jnp.array([median_bandwidth_X]), jnp.array([median_bandwidth_Y]))
-    elif agg_type == "ksd":
-        compute_h_values = compute_h_KSD_values
-        assert l_minus == 0
-        number_bandwidths = l_plus
-        max_samples = 500
-        distances = jax_distances(X, X, max_samples)
-        distances = distances[distances > 0]
-        lambda_min = 1
-        lambda_max = jnp.maximum(jnp.max(distances), 2)
-        power = (lambda_max / lambda_min) ** (1 / (number_bandwidths - 1))
-        bandwidths = jnp.array([power ** i * lambda_min / X.shape[1] for i in range(number_bandwidths)])
-    else:
-        raise ValueError('The value of agg_type should be "mmd" or' '"hsic" or "ksd".')
-
-    h_values, index_i, index_j, N = compute_h_values(
-        X, Y, R, bandwidths, return_indices_N=True
-    )
-    bootstrap_values, original_value = compute_bootstrap_values(
-        h_values, index_i, index_j, N, B, seed, return_original=True
-    )
-    assert bootstrap_values.shape[0] == 1
-
-    bootstrap_1 = jnp.column_stack([bootstrap_values, original_value])
-    bootstrap_1_sorted = jnp.sort(bootstrap_1)
-    quantile = bootstrap_1_sorted[0, (jnp.ceil((B + 1) * (1 - alpha))).astype(int) - 1]
-    if original_value > quantile:
-        return 1
-    return 0
-
 @partial(jit, static_argnums=(2,))
 def jax_distances(X, Y, max_samples):
     def dist(x, y):
@@ -770,4 +944,3 @@ def human_readable_dict(dictionary):
             for key in dictionary[meta_key].keys():
                 if isinstance(dictionary[meta_key][key], jnp.ndarray):
                     dictionary[meta_key][key] = dictionary[meta_key][key].item()
-
