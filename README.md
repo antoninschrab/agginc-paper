@@ -10,8 +10,9 @@ The code for reproducibility of the experiments of our paper, and for generating
 - `python 3.9`
 
 The packages in [requirements.txt](requirements.txt) are required to run our tests and the ones we compare against. 
-
 The `numpy` package version `<= 1.21` is only needed for compatibility with the `theano` package.
+
+Additionally, the `jax` and `jaxlib` packages are required to run the Jax implementation of AggInc in [agginc/jax.py](agginc/jax.py).
 
 ## Installation
 
