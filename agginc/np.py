@@ -1,4 +1,5 @@
 """
+Numpy implementation
 This file contains our three tests:
 MMDAggInc, HSICAggInc and KSDAggInc
 which are implemented in the function agginc()
@@ -132,11 +133,11 @@ def agginc(
     {'MMDAggInc test reject': True,
      'Single test 1': {'Reject': True,
       'Kernel': 'Gaussian',
-      'Bandwidth': 2.2463013508508305,
-      'MMD': 0.07716755221068325,
-      'MMD quantile': 0.001093349286474927,
+      'Bandwidth': 0.5615753377127076,
+      'MMD': 3.841147128497093e-06,
+      'MMD quantile': 2.131735610252617e-06,
       'p-value': 0.001996007984031936,
-      'p-value threshold': 0.04191616766467021},
+      'p-value threshold': 0.0259481037924143},
       ...
     }
     

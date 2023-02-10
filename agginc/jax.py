@@ -1,4 +1,5 @@
 """
+Jax implementation
 This file contains our three tests:
 MMDAggInc, HSICAggInc and KSDAggInc
 which are implemented in the function agginc()
@@ -129,7 +130,7 @@ def agginc(
     >>> key, subkey = random.split(key)
     >>> subkeys = random.split(subkey, num=2)
     >>> X = random.uniform(subkeys[0], shape=(500, 10))
-    >>> Y = random.uniform(subkeys[1], shape=(500, 10)) + 2
+    >>> Y = random.uniform(subkeys[1], shape=(500, 10)) + 1
     >>> output = agginc("mmd", X, Y)
     >>> output
     Array(1, dtype=int32)
@@ -138,17 +139,17 @@ def agginc(
     >>> output, dictionary = agginc("mmd", X, Y, return_dictionary=True)
     >>> output
     Array(1, dtype=int32)
-    >>> from agginc_jax import human_readable_dict
+    >>> from agginc.jax import human_readable_dict
     >>> human_readable_dict(dictionary)
     >>> dictionary
     {'MMDAggInc test reject': True,
-     'Single test 1': {'Bandwidth': 2.4281654357910156,
+     'Single test 1': {'Bandwidth': 0.8926196098327637,
       'Kernel Gaussian': True,
-      'MMD': 1.5090975761413574,
-      'MMD quantile': 0.009915531612932682,
+      'MMD': 0.3186362385749817,
+      'MMD quantile': 0.0025616204366087914,
       'Reject': True,
       'p-value': 0.0019960079807788134,
-      'p-value threshold': 0.04990014061331749},
+      'p-value threshold': 0.04590817913413048},
       ...
     }
     
@@ -157,33 +158,33 @@ def agginc(
     >>> key, subkey = random.split(key)
     >>> subkeys = random.split(subkey, num=2)
     >>> X = random.uniform(subkeys[0], shape=(500, 10))
-    >>> Y = random.uniform(subkeys[1], shape=(500, 10)) + 2
+    >>> Y = 0.5 * X + random.uniform(subkeys[1], shape=(500, 10))
     >>> output = agginc("hsic", X, Y)
     >>> output
     Array(0, dtype=int32)
     >>> output.item()
-    0
+    1
     >>> output, dictionary = agginc("hsic", X, Y, return_dictionary=True)
     >>> output
-    Array(0, dtype=int32)
-    >>> from agginc_jax import human_readable_dict
+    Array(1, dtype=int32)
+    >>> from agginc.jax import human_readable_dict
     >>> human_readable_dict(dictionary)
     >>> dictionary
-    {'HSICAggInc test reject': False,
+    {'HSICAggInc test reject': True,
      'Single test 1': {'Bandwidth X': 0.31978243589401245,
-      'Bandwidth Y': 0.31818556785583496,
-      'HSIC': -6.376725369960923e-09,
-      'HSIC quantile': 7.306860538847104e-07,
+      'Bandwidth Y': 0.3518877327442169,
+      'HSIC': 3.8373030974980793e-07,
+      'HSIC quantile': 8.487702416459797e-07,
       'Kernel Gaussian': True,
       'Reject': False,
-      'p-value': 0.4870259463787079,
+      'p-value': 0.17365269362926483,
       'p-value threshold': 0.007984011434018612},
       ...
     }
     
     >>> # KSDAggInc
     >>> perturbation = 0.5
-    >>> rs = jnp.random.RandomState(0)
+    >>> rs = np.random.RandomState(0)
     >>> X = rs.gamma(5 + perturbation, 5, (500, 1))
     >>> score_gamma = lambda x, k, theta : (k - 1) / x - 1 / theta
     >>> score_X = score_gamma(X, 5, 5)
@@ -197,6 +198,8 @@ def agginc(
     >>> output, dictionary = agginc("ksd", X, score_X, return_dictionary=True)
     >>> output
     Array(1, dtype=int32)
+    >>> from agginc.jax import human_readable_dict
+    >>> human_readable_dict(dictionary)
     >>> dictionary
     {'KSDAggInc test reject': True,
      'Single test 1': {'Bandwidth': 1.0,
