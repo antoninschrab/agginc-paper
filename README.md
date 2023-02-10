@@ -52,11 +52,11 @@ For using the Jax implementation of our tests, Jax needs to be installed, for wh
 
 ## How to use MMDAggInc, HSICAggInc and KSDAggInc in practice?
 
-The MMDAggInc, HSICAggInc and KSDAggInc tests are implemented as the function `agginc` in [agginc_np.py](agginc_np.py) for the Numpy version and in [agginc_jax.py](agginc_jax.py) for the Jax version.
+The MMDAggInc, HSICAggInc and KSDAggInc tests are implemented as the function `agginc` in [agginc/np.py](agginc/np.py) for the Numpy version and in [agginc/jax.py](agginc/jax.py) for the Jax version.
 
-For our Numpy implementation of our AggInc tests, we only require the `numpy`, `scipy` and `psutil` packages.
+For the Numpy implementation of our AggInc tests, we only require the `numpy`, `scipy` and `psutil` packages.
 
-For our Jax implementation of our AggInc tests, we only require the `jax`, `jaxlib` and `psutil` packages.
+For the Jax implementation of our AggInc tests, we only require the `jax`, `jaxlib` and `psutil` packages.
 
 To use our tests in practice, we recommend using our `agginc` package which is available on the [agginc](https://github.com/antoninschrab/agginc) repository. It can be installed by running
 ```bash
@@ -70,7 +70,7 @@ In practice, we recommend using the Jax implementation as it runs considerably f
 
 ## Speed comparison
 
-We recommend using our Jax implementation in [agginc_jax.py](agginc_jax.py) over our Numpy implementation in [agginc_np.py](agginc_np.py) as it runs more than 100 times faster after compilation, as can be seen from the results in the notebook [speed.ipynb](speed.ipynb) which are reported below.
+We recommend using our Jax implementation in [agginc/jax.py](agginc/jax.py) over our Numpy implementation in [agginc/np.py](agginc/np.py) as it runs more than 100 times faster after compilation, as can be seen from the results in the notebook [speed.ipynb](speed.ipynb) which are reported below.
 
 | Speed in ms | Numpy (CPU) | Jax (CPU) | Jax (GPU) | 
 | -- | -- | -- | -- |
