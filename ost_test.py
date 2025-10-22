@@ -15,7 +15,7 @@ import torch
 from scipy.stats import norm
 from scipy.stats import chi as chi_stats
 from cvxopt import matrix, solvers
-from agginc_test import compute_median_bandwidth
+import scipy.spatial
 import numpy as np
 
 
@@ -351,3 +351,29 @@ def ost(seed, X, Y, alpha, kernel_type, l_minus, l_plus):
         max_condition=1e-5,  # changed from 1e-6
         constraints='Sigma',
     )
+
+def compute_median_bandwidth(seed, Z, max_samples=500, min_value=0.0001, shuffle=False):
+    """
+    Compute the median L^2-distance between all the points in Z using at
+    most max_samples samples and using a minimum threshold value min_value.
+    inputs: seed: non-negative integer
+            X: (m,d) array of samples
+            max_samples: number of samples used to compute the median (int or None)
+    output: median bandwidth (float)
+    """
+    if max_samples != None:
+        if shuffle:
+            rs = np.random.RandomState(seed)
+            pZ = rs.choice(X.shape[0], min(max_samples, Z.shape[0]), replace=False)
+            median_bandwidth = np.median(
+                scipy.spatial.distance.pdist(Z[pZ], "euclidean")
+            )
+        else:
+            median_bandwidth = np.median(
+                scipy.spatial.distance.pdist(
+                    Z[: min(max_samples, Z.shape[0])], "euclidean"
+                )
+            )
+    else:
+        median_bandwidth = np.median(scipy.spatial.distance.pdist(Z, "euclidean"))
+    return np.maximum(median_bandwidth, min_value)
